@@ -196,11 +196,11 @@
                         <div class="pulse"></div>
                     </div>
                     <div class="flex space-x-4">
-                        <button id="captureBtn" class="btn-primary flex-1 py-3 px-4 rounded-lg text-white font-medium flex items-center justify-center">
+                        <button id="captureBtn" onclick="detect_faces()" class="btn-primary flex-1 py-3 px-4 rounded-lg text-white font-medium flex items-center justify-center">
                             <i class="fas fa-camera mr-2"></i> Capture Attendance
                         </button>
-                        <button id="registerBtn" class="btn-secondary flex-1 py-3 px-4 rounded-lg text-white font-medium flex items-center justify-center">
-                            <i class="fas fa-user-plus mr-2"></i> Register New Student
+                        <button id="registerBtn" onclick="register_face" class="btn-secondary flex-1 py-3 px-4 rounded-lg text-white font-medium flex items-center justify-center">
+                            <i class="fas fa-user-plus mr-2"></i> Register New Student 
                         </button>
                     </div>
                 </div>
@@ -636,48 +636,6 @@
                 submitRegistration.innerHTML = '<i class="fas fa-user-plus mr-2"></i> Register Student';
             }
         });
-        
-        // Add initial placeholder attendance data for demonstration
-        setTimeout(() => {
-            const sampleData = [
-                { name: "Rahul Sharma", time: "08:45 AM", status: "present" },
-                { name: "Priya Patel", time: "08:52 AM", status: "present" },
-                { name: "Aditya Verma", time: "09:10 AM", status: "late" }
-            ];
-            
-            const attendanceContainer = document.getElementById('attendanceContainer');
-            attendanceContainer.innerHTML = '';
-            
-            sampleData.forEach(student => {
-                const card = document.createElement('div');
-                card.id = `attendance-${student.name.replace(/\s+/g, '')}`;
-                card.className = 'attendance-card bg-white rounded-lg shadow-sm p-4 mb-3 flex items-center justify-between';
-                
-                card.innerHTML = `
-                    <div class="flex items-center">
-                        <div class="avatar-container bg-gray-100 w-12 h-12 rounded-lg mr-4 flex items-center justify-center">
-                            <i class="fas fa-user text-xl text-blue-500"></i>
-                            <div class="status-badge w-4 h-4 rounded-full ${student.status === 'present' ? 'bg-green-500' : 'bg-yellow-500'}"></div>
-                        </div>
-                        <div>
-                            <h3 class="font-medium">${student.name}</h3>
-                            <p class="text-xs text-gray-500">AIML-A Student</p>
-                        </div>
-                    </div>
-                    <div>
-                        <div class="text-xs font-medium ${student.status === 'present' ? 'text-green-600' : 'text-yellow-600'} mb-1">
-                            ${student.status === 'present' ? 'Present' : 'Late'}
-                        </div>
-                        <div class="text-xs text-gray-500">${student.time}</div>
-                    </div>
-                `;
-                
-                attendanceContainer.appendChild(card);
-            });
-            
-            document.getElementById('presentCount').textContent = sampleData.filter(s => s.status === 'present').length;
-            document.getElementById('absentCount').textContent = '17';
-        }, 1000);
     </script>
 </body>
 </html>
