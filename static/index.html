@@ -1,108 +1,683 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Face Recognition Test</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jain University | AIML-A Attendance System</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
-        .container {
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 20px;
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+        
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #e4e8ed 100%);
         }
-        .preview {
-            max-width: 400px;
-            margin: 20px 0;
+        
+        .glass-card {
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            box-shadow: 0 8px 32px rgba(31, 38, 135, 0.15);
+            border: 1px solid rgba(255, 255, 255, 0.18);
         }
-        .result {
-            margin: 20px 0;
-            padding: 10px;
-            background: #f0f0f0;
+        
+        .btn-primary {
+            background: linear-gradient(90deg, #3b82f6 0%, #2563eb 100%);
+            transition: all 0.3s ease;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 15px rgba(37, 99, 235, 0.3);
+        }
+        
+        .btn-secondary {
+            background: linear-gradient(90deg, #64748b 0%, #475569 100%);
+            transition: all 0.3s ease;
+        }
+        
+        .btn-secondary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 15px rgba(71, 85, 105, 0.3);
+        }
+        
+        .camera-container {
+            position: relative;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+        }
+        
+        .pulse {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            height: 12px;
+            width: 12px;
+            background-color: #22c55e;
+            border-radius: 50%;
+            box-shadow: 0 0 0 rgba(34, 197, 94, 0.4);
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% {
+                box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4);
+            }
+            70% {
+                box-shadow: 0 0 0 10px rgba(34, 197, 94, 0);
+            }
+            100% {
+                box-shadow: 0 0 0 0 rgba(34, 197, 94, 0);
+            }
+        }
+        
+        .camera-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            border: 2px solid rgba(59, 130, 246, 0.5);
+            border-radius: 16px;
+            z-index: 10;
+            pointer-events: none;
+        }
+        
+        .camera-overlay::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(59, 130, 246, 0.8), transparent);
+            animation: scan 2s linear infinite;
+        }
+        
+        @keyframes scan {
+            0% {
+                top: 0%;
+            }
+            100% {
+                top: 100%;
+            }
+        }
+        
+        .attendance-card {
+            transition: all 0.3s ease;
+        }
+        
+        .attendance-card:hover {
+            transform: translateY(-5px);
+        }
+        
+        .avatar-container {
+            position: relative;
+            overflow: hidden;
+            border-radius: 12px;
+        }
+        
+        .status-badge {
+            position: absolute;
+            bottom: -3px;
+            right: -3px;
+            border: 2px solid white;
+        }
+        
+        .attendance-list::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        .attendance-list::-webkit-scrollbar-track {
+            background: #f1f5f9;
+            border-radius: 10px;
+        }
+        
+        .attendance-list::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 10px;
+        }
+        
+        .attendance-list::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+        
+        .ripple {
+            position: absolute;
+            border-radius: 50%;
+            transform: scale(0);
+            animation: ripple 0.8s linear;
+            background-color: rgba(255, 255, 255, 0.3);
+        }
+        
+        @keyframes ripple {
+            to {
+                transform: scale(4);
+                opacity: 0;
+            }
         }
     </style>
 </head>
-<body>
-    <div class="container">
-        <h1>Face Recognition Test</h1>
+<body class="min-h-screen py-8 px-4">
+    <div class="max-w-6xl mx-auto">
+        <!-- Header -->
+        <header class="glass-card p-6 mb-8 flex justify-between items-center">
+            <div class="flex items-center">
+                <div class="p-3 rounded-full mr-4 bg-blue-100">
+                    <i class="fas fa-university text-blue-600 text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="text-2xl font-bold text-gray-800">Jain University</h1>
+                    <p class="text-sm text-gray-600">AIML-A Attendance System</p>
+                </div>
+            </div>
+            <div class="flex items-center">
+                <div class="flex items-center mr-6">
+                    <div class="pulse"></div>
+                    <span class="ml-4 text-sm text-gray-600">System Active</span>
+                </div>
+                <div class="text-right">
+                    <p class="text-gray-800 font-medium" id="currentDate">March 11, 2025</p>
+                    <p class="text-sm text-gray-600" id="currentTime">10:25 AM</p>
+                </div>
+            </div>
+        </header>
         
-        <h2>Register Face</h2>
-        <input type="file" id="registerImage" accept="image/*">
-        <input type="text" id="name" placeholder="Name">
-        <input type="text" id="employeeId" placeholder="Employee ID">
-        <input type="text" id="department" placeholder="Department">
-        <input type="text" id="position" placeholder="Position">
-        <button onclick="registerFace()">Register</button>
-        <img id="registerPreview" class="preview">
-        <div id="registerResult" class="result"></div>
-
-        <h2>Detect Faces</h2>
-        <input type="file" id="detectImage" accept="image/*">
-        <button onclick="detectFaces()">Detect</button>
-        <img id="detectPreview" class="preview">
-        <div id="detectResult" class="result"></div>
+        <div class="flex flex-col lg:flex-row gap-8">
+            <!-- Left Side - Camera and Controls -->
+            <div class="flex-1">
+                <div class="glass-card p-6 mb-6">
+                    <h2 class="text-xl font-semibold text-gray-800 mb-4">Facial Recognition</h2>
+                    <div class="camera-container mb-4">
+                        <video id="video" width="100%" height="auto" autoplay class="rounded-xl"></video>
+                        <div class="camera-overlay"></div>
+                        <div class="pulse"></div>
+                    </div>
+                    <div class="flex space-x-4">
+                        <button id="captureBtn" class="btn-primary flex-1 py-3 px-4 rounded-lg text-white font-medium flex items-center justify-center">
+                            <i class="fas fa-camera mr-2"></i> Capture Attendance
+                        </button>
+                        <button id="registerBtn" class="btn-secondary flex-1 py-3 px-4 rounded-lg text-white font-medium flex items-center justify-center">
+                            <i class="fas fa-user-plus mr-2"></i> Register New Student
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="glass-card p-6">
+                    <h2 class="text-xl font-semibold text-gray-800 mb-4">Recognition Results</h2>
+                    <div id="detectionResult" class="bg-gray-50 rounded-lg p-4 min-h-32 max-h-64 overflow-auto">
+                        <div class="text-gray-500 text-center py-4">
+                            <i class="fas fa-camera text-2xl mb-2"></i>
+                            <p>Capture an image to see recognition results</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Right Side - Attendance List -->
+            <div class="flex-1">
+                <div class="glass-card p-6 h-full">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-xl font-semibold text-gray-800">Today's Attendance</h2>
+                        <div class="text-sm text-gray-600">
+                            <span class="px-2 py-1 rounded-full bg-green-100 text-green-600 mr-2">
+                                <i class="fas fa-check-circle mr-1"></i> Present: <span id="presentCount">0</span>
+                            </span>
+                            <span class="px-2 py-1 rounded-full bg-red-100 text-red-600">
+                                <i class="fas fa-times-circle mr-1"></i> Absent: <span id="absentCount">0</span>
+                            </span>
+                        </div>
+                    </div>
+                    
+                    <div class="attendance-list h-96 overflow-y-auto pr-2">
+                        <div id="attendanceContainer">
+                            <!-- Attendance items will be dynamically inserted here -->
+                            <div class="text-gray-500 text-center py-12">
+                                <i class="far fa-clipboard text-4xl mb-3"></i>
+                                <p class="mb-1">No attendance records yet</p>
+                                <p class="text-sm">Students will appear here once recognized</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Register Modal -->
+        <div id="registerModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+            <div class="glass-card p-6 w-full max-w-lg mx-4">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-semibold text-gray-800">Register New Student</h2>
+                    <button id="closeModal" class="text-gray-500 hover:text-gray-700">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                
+                <div class="flex flex-col md:flex-row gap-6 mb-6">
+                    <div class="flex-1">
+                        <div class="camera-container">
+                            <video id="registerVideo" width="100%" height="auto" autoplay class="rounded-xl"></video>
+                        </div>
+                        <button id="takePictureBtn" class="btn-primary w-full mt-3 py-2 px-4 rounded-lg text-white font-medium">
+                            <i class="fas fa-camera mr-2"></i> Take Picture
+                        </button>
+                    </div>
+                    
+                    <div class="flex-1">
+                        <div class="mb-4">
+                            <label class="block text-gray-700 text-sm font-medium mb-2" for="studentName">Full Name</label>
+                            <input type="text" id="studentName" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="John Doe">
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label class="block text-gray-700 text-sm font-medium mb-2" for="studentId">Student ID</label>
+                            <input type="text" id="studentId" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="AIML2023001">
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label class="block text-gray-700 text-sm font-medium mb-2" for="studentDepartment">Department</label>
+                            <input type="text" id="studentDepartment" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" value="AIML-A" readonly>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label class="block text-gray-700 text-sm font-medium mb-2" for="studentPosition">Position</label>
+                            <select id="studentPosition" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value="Student">Student</option>
+                                <option value="Class Representative">Class Representative</option>
+                                <option value="Faculty">Faculty</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="flex justify-end">
+                    <button id="submitRegistration" class="btn-primary py-3 px-6 rounded-lg text-white font-medium">
+                        <i class="fas fa-user-plus mr-2"></i> Register Student
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
-        function getBase64(file) {
-            return new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.readAsDataURL(file);
-                reader.onload = () => {
-                    // Get the base64 string without the data URL prefix
-                    const base64String = reader.result.split(',')[1];
-                    resolve(base64String);
-                };
-                reader.onerror = error => reject(error);
-            });
+        // Initialize date and time
+        function updateDateTime() {
+            const now = new Date();
+            const dateOptions = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+            const timeOptions = { hour: '2-digit', minute: '2-digit' };
+            
+            document.getElementById('currentDate').textContent = now.toLocaleDateString('en-US', dateOptions);
+            document.getElementById('currentTime').textContent = now.toLocaleTimeString('en-US', timeOptions);
         }
-    
-        async function detectFaces() {
-            const file = document.getElementById('detectImage').files[0];
-            if (!file) {
-                alert('Please select an image');
-                return;
-            }
-    
+        
+        updateDateTime();
+        setInterval(updateDateTime, 60000);
+        
+        // Camera initialization
+        let stream;
+        const video = document.getElementById('video');
+        const registerVideo = document.getElementById('registerVideo');
+        
+        async function startCamera(videoElement) {
             try {
-                const image_data = await getBase64(file);
+                stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { 
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 },
+                        facingMode: "user" 
+                    } 
+                });
+                videoElement.srcObject = stream;
+            } catch (err) {
+                console.error("Error accessing camera: ", err);
+                alert("Error accessing camera. Please ensure camera permissions are granted.");
+            }
+        }
+        
+        // Start camera on page load
+        startCamera(video);
+        
+        // Capture attendance
+        let capturedImage = null;
+        const captureBtn = document.getElementById('captureBtn');
+        
+        captureBtn.addEventListener('click', async () => {
+            // Create ripple effect
+            const ripple = document.createElement('span');
+            ripple.className = 'ripple';
+            captureBtn.appendChild(ripple);
+            
+            const rect = captureBtn.getBoundingClientRect();
+            ripple.style.width = ripple.style.height = Math.max(rect.width, rect.height) + 'px';
+            ripple.style.left = (event.clientX - rect.left - ripple.offsetWidth / 2) + 'px';
+            ripple.style.top = (event.clientY - rect.top - ripple.offsetHeight / 2) + 'px';
+            
+            setTimeout(() => {
+                ripple.remove();
+            }, 800);
+            
+            // Capture image from video
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            
+            // Get base64 image data
+            const imageData = canvas.toDataURL('image/jpeg').split(',')[1];
+            
+            try {
+                // Show loading state
+                captureBtn.disabled = true;
+                captureBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Processing...';
+                
+                // Call API
                 const response = await fetch('http://127.0.0.1:8080/detect-faces', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ image_data })
+                    body: JSON.stringify({ image_data: imageData })
                 });
+                
+                if (!response.ok) {
+                    throw new Error(`Server responded with ${response.status}`);
+                }
+                
                 const result = await response.json();
-                document.getElementById('detectResult').textContent = JSON.stringify(result, null, 2);
+                console.log(result);
+                
+                // Display results
+                displayDetectionResults(result, imageData);
+                
+                // Update attendance list if needed
+                if (result.results && result.results.length > 0) {
+                    updateAttendanceList(result.results);
+                }
+                
             } catch (error) {
-                document.getElementById('detectResult').textContent = 'Error: ' + error.message;
+                console.error("Error detecting faces: ", error);
+                document.getElementById('detectionResult').innerHTML = `
+                    <div class="bg-red-50 text-red-600 p-4 rounded">
+                        <i class="fas fa-exclamation-circle mr-2"></i> Error: ${error.message}
+                    </div>
+                `;
+            } finally {
+                // Reset button state
+                captureBtn.disabled = false;
+                captureBtn.innerHTML = '<i class="fas fa-camera mr-2"></i> Capture Attendance';
             }
-        }
-    
-        async function registerFace() {
-            const file = document.getElementById('registerImage').files[0];
-            if (!file) {
-                alert('Please select an image');
+        });
+        
+        // Display detection results
+        function displayDetectionResults(data, imageData) {
+            const resultsContainer = document.getElementById('detectionResult');
+            
+            if (!data.results || data.results.length === 0) {
+                resultsContainer.innerHTML = `
+                    <div class="bg-yellow-50 text-yellow-600 p-4 rounded flex items-center">
+                        <i class="fas fa-exclamation-triangle text-xl mr-3"></i>
+                        <div>
+                            <p class="font-medium">No faces detected</p>
+                            <p class="text-sm">Please ensure the person is clearly visible in the camera</p>
+                        </div>
+                    </div>
+                `;
                 return;
             }
-    
+            
+            let resultsHTML = `
+                <div class="mb-3 flex justify-between items-center">
+                    <p class="font-medium">Detected ${data.results.length} ${data.results.length === 1 ? 'person' : 'people'}</p>
+                    <span class="text-xs text-gray-500">${new Date().toLocaleTimeString()}</span>
+                </div>
+            `;
+            
+            data.results.forEach(person => {
+                const confidencePercentage = Math.round(person.confidence * 100);
+                const confidenceColor = confidencePercentage > 80 ? 'green' : (confidencePercentage > 60 ? 'yellow' : 'red');
+                
+                resultsHTML += `
+                    <div class="bg-white rounded-lg p-3 mb-2 shadow-sm flex items-center justify-between">
+                        <div class="flex items-center">
+                            <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center mr-3">
+                                <i class="fas fa-user text-blue-600"></i>
+                            </div>
+                            <div>
+                                <p class="font-medium">${person.name}</p>
+                                <p class="text-xs text-gray-500">
+                                    ${person.attendance_marked ? 
+                                        '<i class="fas fa-check-circle text-green-600 mr-1"></i> Attendance marked' : 
+                                        '<i class="fas fa-clock text-yellow-600 mr-1"></i> Processing'}
+                                </p>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <div class="inline-block px-2 py-1 rounded-full text-xs text-${confidenceColor}-600 bg-${confidenceColor}-100">
+                                <i class="fas fa-percentage mr-1"></i> ${confidencePercentage}%
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            resultsContainer.innerHTML = resultsHTML;
+        }
+        
+        // Update attendance list
+        function updateAttendanceList(people) {
+            const attendanceContainer = document.getElementById('attendanceContainer');
+            const presentCount = document.getElementById('presentCount');
+            
+            // Clear previous "no attendance" message if exists
+            if (attendanceContainer.querySelector('.text-center')) {
+                attendanceContainer.innerHTML = '';
+            }
+            
+            // Create attendance cards for new people
+            people.forEach(person => {
+                if (person.attendance_marked && person.name !== 'Unknown') {
+                    const existingCard = document.getElementById(`attendance-${person.name.replace(/\s+/g, '')}`);
+                    
+                    if (!existingCard) {
+                        const card = document.createElement('div');
+                        card.id = `attendance-${person.name.replace(/\s+/g, '')}`;
+                        card.className = 'attendance-card bg-white rounded-lg shadow-sm p-4 mb-3 flex items-center justify-between';
+                        
+                        const now = new Date();
+                        const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+                        const status = now.getHours() < 9 ? 'present' : 'late';
+                        
+                        card.innerHTML = `
+                            <div class="flex items-center">
+                                <div class="avatar-container bg-gray-100 w-12 h-12 rounded-lg mr-4 flex items-center justify-center">
+                                    <i class="fas fa-user text-xl text-blue-500"></i>
+                                    <div class="status-badge w-4 h-4 rounded-full ${status === 'present' ? 'bg-green-500' : 'bg-yellow-500'}"></div>
+                                </div>
+                                <div>
+                                    <h3 class="font-medium">${person.name}</h3>
+                                    <p class="text-xs text-gray-500">AIML-A Student</p>
+                                </div>
+                            </div>
+                            <div>
+                                <div class="text-xs font-medium ${status === 'present' ? 'text-green-600' : 'text-yellow-600'} mb-1">
+                                    ${status === 'present' ? 'Present' : 'Late'}
+                                </div>
+                                <div class="text-xs text-gray-500">${timeStr}</div>
+                            </div>
+                        `;
+                        
+                        // Add to container at the top
+                        if (attendanceContainer.firstChild) {
+                            attendanceContainer.insertBefore(card, attendanceContainer.firstChild);
+                        } else {
+                            attendanceContainer.appendChild(card);
+                        }
+                        
+                        // Update count
+                        presentCount.textContent = parseInt(presentCount.textContent) + 1;
+                        
+                        // Animation
+                        card.style.opacity = '0';
+                        card.style.transform = 'translateY(20px)';
+                        setTimeout(() => {
+                            card.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
+                            card.style.opacity = '1';
+                            card.style.transform = 'translateY(0)';
+                        }, 100);
+                    }
+                }
+            });
+        }
+        
+        // Register modal functionality
+        const registerBtn = document.getElementById('registerBtn');
+        const registerModal = document.getElementById('registerModal');
+        const closeModal = document.getElementById('closeModal');
+        
+        registerBtn.addEventListener('click', () => {
+            registerModal.classList.remove('hidden');
+            startCamera(registerVideo);
+        });
+        
+        closeModal.addEventListener('click', () => {
+            registerModal.classList.add('hidden');
+            if (registerVideo.srcObject) {
+                const tracks = registerVideo.srcObject.getTracks();
+                tracks.forEach(track => track.stop());
+            }
+        });
+        
+        // Take picture for registration
+        let registrationImage = null;
+        const takePictureBtn = document.getElementById('takePictureBtn');
+        
+        takePictureBtn.addEventListener('click', () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = registerVideo.videoWidth;
+            canvas.height = registerVideo.videoHeight;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(registerVideo, 0, 0, canvas.width, canvas.height);
+            
+            registrationImage = canvas.toDataURL('image/jpeg').split(',')[1];
+            
+            // Show success message
+            takePictureBtn.innerHTML = '<i class="fas fa-check mr-2"></i> Picture Taken';
+            takePictureBtn.classList.remove('btn-primary');
+            takePictureBtn.classList.add('bg-green-500', 'hover:bg-green-600');
+            
+            setTimeout(() => {
+                takePictureBtn.innerHTML = '<i class="fas fa-camera mr-2"></i> Take Again';
+                takePictureBtn.classList.add('btn-primary');
+                takePictureBtn.classList.remove('bg-green-500', 'hover:bg-green-600');
+            }, 2000);
+        });
+        
+        // Submit registration
+        const submitRegistration = document.getElementById('submitRegistration');
+        
+        submitRegistration.addEventListener('click', async () => {
+            const name = document.getElementById('studentName').value;
+            const employeeId = document.getElementById('studentId').value;
+            const department = document.getElementById('studentDepartment').value;
+            const position = document.getElementById('studentPosition').value;
+            
+            if (!name || !employeeId || !department || !registrationImage) {
+                alert('Please fill all fields and take a picture');
+                return;
+            }
+            
+            // Show loading state
+            submitRegistration.disabled = true;
+            submitRegistration.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Registering...';
+            
             try {
-                const image_data = await getBase64(file);
-                const data = {
-                    name: document.getElementById('name').value,
-                    employee_id: document.getElementById('employeeId').value,
-                    department: document.getElementById('department').value,
-                    position: document.getElementById('position').value,
-                    image_data: image_data
-                };
-    
                 const response = await fetch('http://127.0.0.1:8080/register-face', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(data)
+                    body: JSON.stringify({
+                        name,
+                        employee_id: employeeId,
+                        department,
+                        position,
+                        image_data: registrationImage
+                    })
                 });
+                
+                if (!response.ok) {
+                    throw new Error(`Server responded with ${response.status}`);
+                }
+                
                 const result = await response.json();
-                document.getElementById('registerResult').textContent = JSON.stringify(result, null, 2);
+                console.log(result);
+                
+                // Show success message
+                alert('Student registered successfully!');
+                
+                // Close modal
+                registerModal.classList.add('hidden');
+                if (registerVideo.srcObject) {
+                    const tracks = registerVideo.srcObject.getTracks();
+                    tracks.forEach(track => track.stop());
+                }
+                
+                // Reset form
+                document.getElementById('studentName').value = '';
+                document.getElementById('studentId').value = '';
+                document.getElementById('studentPosition').selectedIndex = 0;
+                registrationImage = null;
+                
             } catch (error) {
-                document.getElementById('registerResult').textContent = 'Error: ' + error.message;
+                console.error("Error registering face: ", error);
+                alert(`Error registering student: ${error.message}`);
+            } finally {
+                // Reset button state
+                submitRegistration.disabled = false;
+                submitRegistration.innerHTML = '<i class="fas fa-user-plus mr-2"></i> Register Student';
             }
-        }
+        });
+        
+        // Add initial placeholder attendance data for demonstration
+        setTimeout(() => {
+            const sampleData = [
+                { name: "Rahul Sharma", time: "08:45 AM", status: "present" },
+                { name: "Priya Patel", time: "08:52 AM", status: "present" },
+                { name: "Aditya Verma", time: "09:10 AM", status: "late" }
+            ];
+            
+            const attendanceContainer = document.getElementById('attendanceContainer');
+            attendanceContainer.innerHTML = '';
+            
+            sampleData.forEach(student => {
+                const card = document.createElement('div');
+                card.id = `attendance-${student.name.replace(/\s+/g, '')}`;
+                card.className = 'attendance-card bg-white rounded-lg shadow-sm p-4 mb-3 flex items-center justify-between';
+                
+                card.innerHTML = `
+                    <div class="flex items-center">
+                        <div class="avatar-container bg-gray-100 w-12 h-12 rounded-lg mr-4 flex items-center justify-center">
+                            <i class="fas fa-user text-xl text-blue-500"></i>
+                            <div class="status-badge w-4 h-4 rounded-full ${student.status === 'present' ? 'bg-green-500' : 'bg-yellow-500'}"></div>
+                        </div>
+                        <div>
+                            <h3 class="font-medium">${student.name}</h3>
+                            <p class="text-xs text-gray-500">AIML-A Student</p>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="text-xs font-medium ${student.status === 'present' ? 'text-green-600' : 'text-yellow-600'} mb-1">
+                            ${student.status === 'present' ? 'Present' : 'Late'}
+                        </div>
+                        <div class="text-xs text-gray-500">${student.time}</div>
+                    </div>
+                `;
+                
+                attendanceContainer.appendChild(card);
+            });
+            
+            document.getElementById('presentCount').textContent = sampleData.filter(s => s.status === 'present').length;
+            document.getElementById('absentCount').textContent = '17';
+        }, 1000);
     </script>
 </body>
 </html>
