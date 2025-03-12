@@ -141,7 +141,13 @@ def process_face_encoding(face_encoding, known_face_encodings, known_face_names,
 def process_image(image_data, tolerance=0.6, model="hog", class_filter="AIML-A"):
     """Process image for face detection and recognition"""
     try:
+        # Get face embeddings first
         known_face_encodings, known_face_names, known_face_ids, known_departments = get_face_embeddings()
+        
+        # Check if there are any registered faces
+        if not known_face_encodings:
+            logger.warning("No registered faces found in the database")
+            return []
         
         image = decode_image(image_data)
         if image is None:
@@ -159,7 +165,16 @@ def process_image(image_data, tolerance=0.6, model="hog", class_filter="AIML-A")
         
         results = []
         for (top, right, bottom, left), face_encoding in zip(face_locations, face_encodings):
-            result = process_face_encoding(face_encoding, known_face_encodings, known_face_names, known_face_ids, known_departments, tolerance, class_filter, (top, right, bottom, left))
+            result = process_face_encoding(
+                face_encoding, 
+                known_face_encodings, 
+                known_face_names, 
+                known_face_ids, 
+                known_departments, 
+                tolerance, 
+                class_filter, 
+                (top, right, bottom, left)
+            )
             if result:
                 results.append(result)
         

@@ -126,6 +126,7 @@ async def register_face(request: RegisterFaceRequest):
                 "department": request.department or "AIML-A",
                 "position": request.position or "Student",
                 "face_embedding": encoded_face,
+                "registration_image": request.image_data,  # Store the actual image
                 "active": True
             }
             
@@ -158,14 +159,13 @@ async def register_face(request: RegisterFaceRequest):
 
 @app.get("/api/attendance/", response_model=List[Attendance])
 async def get_attendance():
-    """Fetch today's attendance records from Supabase"""
     try:
         today = datetime.now().strftime("%Y-%m-%d")
         logger.info(f"Fetching attendance for today: {today}")
         
-        # First get all active students
+        # Get all active students
         students_response = supabase_client.table("people")\
-            .select("id, name, employee_id, department, position")\
+            .select("id, name, employee_id, department, position, registration_image")\
             .eq("department", "AIML-A")\
             .eq("active", True)\
             .execute()
@@ -174,29 +174,35 @@ async def get_attendance():
             logger.info("No active students found")
             return []
             
-        # Get today's attendance records
+        # Get today's attendance records with full student data
         attendance_response = supabase_client.table("attendance")\
             .select("*, people(*)")\
             .eq('date', today)\
             .execute()
-            
-        # Create a map of present students
-        present_students = {
-            record.get("person_id"): record 
-            for record in attendance_response.data
+        
+        # Create a map of students for easy lookup
+        students_map = {
+            student["id"]: student 
+            for student in students_response.data
         }
+        
+        # Track marked students to avoid duplicates
+        marked_students = set()
         
         # Format the response data
         attendance_records = []
         
-        # Process present students
+        # Process present and late students first
         for record in attendance_response.data:
             try:
                 person_data = record.get('people', {})
-                if person_data:
+                person_id = record.get("person_id")
+                
+                if person_data and person_id and person_id not in marked_students:
+                    marked_students.add(person_id)
                     attendance_record = {
                         "id": record.get("id"),
-                        "person_id": record.get("person_id"),
+                        "person_id": person_id,
                         "date": record.get("date"),
                         "time": record.get("time"),
                         "status": record.get("status"),
@@ -209,7 +215,8 @@ async def get_attendance():
                             name=person_data.get("name"),
                             employee_id=person_data.get("employee_id"),
                             department=person_data.get("department"),
-                            position=person_data.get("position")
+                            position=person_data.get("position"),
+                            image=person_data.get("registration_image", "")
                         )
                     }
                     attendance_records.append(Attendance(**attendance_record))
@@ -217,14 +224,15 @@ async def get_attendance():
                 logger.error(f"Error processing attendance record: {str(e)}")
                 continue
         
-        # Add absent students
+        # Add absent students (only those not already marked)
         current_time = datetime.now().strftime("%H:%M:%S")
-        for student in students_response.data:
-            if student["id"] not in present_students:
+        
+        for student_id, student in students_map.items():
+            if student_id not in marked_students:
                 try:
                     attendance_record = {
                         "id": None,
-                        "person_id": student["id"],
+                        "person_id": student_id,
                         "date": today,
                         "time": current_time,
                         "status": "absent",
@@ -237,7 +245,8 @@ async def get_attendance():
                             name=student["name"],
                             employee_id=student["employee_id"],
                             department=student["department"],
-                            position=student["position"]
+                            position=student["position"],
+                            image=student["registration_image"]
                         )
                     }
                     attendance_records.append(Attendance(**attendance_record))
@@ -245,13 +254,12 @@ async def get_attendance():
                     logger.error(f"Error processing absent student: {str(e)}")
                     continue
 
-        # Sort by status (present/late first, then absent) and time
+        # Sort records: present/late first, then absent
         attendance_records.sort(key=lambda x: (
             x.status == "absent",  # False (present/late) comes before True (absent)
             x.time
         ))
 
-        logger.info(f"Returning {len(attendance_records)} attendance records")
         return attendance_records
 
     except Exception as e:
@@ -262,15 +270,29 @@ async def get_attendance():
 async def get_students():
     """Fetch all students from the people table"""
     try:
-        response = supabase_client.from_("people")\
-            .select("id, name, employee_id, department, position, active")\
-            .eq("department", "AIML-A")\
+        response = supabase_client.table("people")\
+            .select("id, name, employee_id, department, position, active, face_embedding, registration_image")\
+            .order('name', desc=False)\
             .execute()
             
         if hasattr(response, "error") and response.error:
             raise HTTPException(status_code=500, detail=f"Supabase Error: {response.error}")
+        
+        # Format the response to include proper image data
+        students_data = []
+        for student in response.data:
+            student_info = {
+                "id": student.get("id"),
+                "name": student.get("name"),
+                "employee_id": student.get("employee_id"),
+                "department": student.get("department"),
+                "position": student.get("position"),
+                "active": student.get("active"),
+                "image": student.get("registration_image", "")  # Use registration_image instead of face_embedding
+            }
+            students_data.append(student_info)
             
-        return response.data
+        return students_data
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching students: {str(e)}")
 

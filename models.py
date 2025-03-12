@@ -9,6 +9,7 @@ class Person(BaseModel):
     employee_id: str
     department: Optional[str] = None
     position: Optional[str] = None
+    image: Optional[str] = None  # Add this line
 
     class Config:
         from_attributes = True
