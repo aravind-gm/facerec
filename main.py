@@ -26,10 +26,11 @@ app = FastAPI(title="Jain University AIML-A Attendance System")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://127.0.0.1:8000",
+        "http://127.0.0.1:8000",  # If your frontend is served from port 8000
         "http://localhost:8000",
-        "http://127.0.0.1:8080",
-        "http://localhost:8080"
+        "http://127.0.0.1:8080",  # If your frontend is served from port 8080 (like uvicorn's default)
+        "http://localhost:8080",  # Or any other ports your frontend might use
+        "http://localhost:5173"  # Common Vite port
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -63,7 +64,6 @@ async def detect_faces(image_data: str = Body(..., embed=True)):
 
 @app.post("/api/register-face")
 async def register_face(request: RegisterFaceRequest):
-    """Register a new face in the system"""
     try:
         # Clean up base64 data
         image_data = request.image_data
@@ -93,16 +93,16 @@ async def register_face(request: RegisterFaceRequest):
         person_data = {
             "name": request.name,
             "employee_id": request.employee_id,
-            "department": "AIML-A",  # Default to AIML-A class
+            "department": request.department or "AIML-A",  # Allow department to be specified or default
             "position": request.position or "Student",
             "face_embedding": encoded_face,
             "active": True
         }
-        
+        logger.info(f"Inserting data: {person_data}")
         # Insert into Supabase
-        response = supabase_client.from_("people").insert(person_data).execute()
+        response = supabase_client.table("people").insert(person_data).execute()  # Use table() for clarity
         
-        if hasattr(response, "error") and response.error:
+        if response.error:  # Simplified error checking
             raise HTTPException(status_code=500, detail=f"Database Error: {response.error}")
             
         return {"message": "Face registered successfully", "name": request.name}
@@ -110,7 +110,8 @@ async def register_face(request: RegisterFaceRequest):
     except HTTPException as he:
         raise he
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error registering face: {str(e)}")
+        logger.error(f"Error registering face: {e}")  # Log the full exception for debugging
+        raise HTTPException(status_code=500, detail=f"Error registering face: {e}")  # Return a generic error to the client
 
 @app.get("/api/attendance/", response_model=List[Attendance])
 async def get_attendance(start_date: Optional[str] = None, end_date: Optional[str] = None):

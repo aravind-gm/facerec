@@ -592,7 +592,7 @@
             submitRegistration.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Registering...';
             
             try {
-                const response = await fetch('http://127.0.0.1:8080/register-face', {
+                const response = await fetch('http://127.0.0.1:8000/api/register-face', {  // Correct URL
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
