@@ -154,9 +154,12 @@ async def register_face(request: RegisterFaceRequest):
 async def get_attendance(start_date: Optional[str] = None, end_date: Optional[str] = None):
     """Fetch attendance records from Supabase with optional date filtering"""
     try:
-        query = supabase_client.from_('attendance')\
-            .select('*, people!inner(*)')\
-            .order('date.desc,time.asc')
+        logger.info(f"Fetching attendance for dates: {start_date} to {end_date}")
+        
+        # Build the query
+        query = supabase_client.table("attendance")\
+            .select("*, people(*)") \
+            .order('created_at', desc=True)
         
         # Apply date filters if provided
         if start_date:
@@ -166,40 +169,43 @@ async def get_attendance(start_date: Optional[str] = None, end_date: Optional[st
             
         response = query.execute()
         
-        if hasattr(response, "error") and response.error:
-            raise HTTPException(status_code=500, detail=f"Supabase Error: {response.error}")
+        if not response.data:
+            logger.info("No attendance records found")
+            return []
 
-        # Process the data to transform into the expected format
+        # Format the response data
         attendance_records = []
         for record in response.data:
-            # Extract person data
-            person_data = {
-                "id": record["person_id"],
-                "name": record["people"]["name"],
-                "employee_id": record["people"]["employee_id"],
-                "department": record["people"]["department"],
-                "position": record["people"]["position"]
-            }
-            
-            # Format the attendance record
-            attendance_record = {
-                "id": record["id"],
-                "person_id": record["person_id"],
-                "date": record["date"],
-                "time": record["time"],
-                "status": record["status"],
-                "confidence": record["confidence"],
-                "marked_by": record["marked_by"],
-                "notes": record["notes"],
-                "created_at": record["created_at"],
-                "person": person_data
-            }
-            
-            attendance_records.append(attendance_record)
-        
+            try:
+                person_data = record.get('people', {})
+                attendance_record = {
+                    "id": record.get("id"),
+                    "person_id": record.get("person_id"),
+                    "date": record.get("date"),
+                    "time": record.get("time"),
+                    "status": record.get("status"),
+                    "confidence": record.get("confidence"),
+                    "marked_by": record.get("marked_by"),
+                    "notes": record.get("notes"),
+                    "created_at": record.get("created_at"),
+                    "person": {
+                        "id": person_data.get("id"),
+                        "name": person_data.get("name"),
+                        "employee_id": person_data.get("employee_id"),
+                        "department": person_data.get("department"),
+                        "position": person_data.get("position")
+                    }
+                }
+                attendance_records.append(attendance_record)
+            except Exception as e:
+                logger.error(f"Error processing attendance record: {str(e)}")
+                continue
+
+        logger.info(f"Returning {len(attendance_records)} attendance records")
         return attendance_records
 
     except Exception as e:
+        logger.error(f"Error fetching attendance: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error fetching attendance: {str(e)}")
 
 @app.get("/api/students/")

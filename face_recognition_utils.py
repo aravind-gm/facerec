@@ -64,6 +64,7 @@ def mark_attendance(person_id, confidence, name):
         
         status = "present" if current_hour < 9 else "late"
         
+        # Check if attendance already exists
         check_response = supabase_client.table("attendance") \
             .select("id") \
             .eq("person_id", person_id) \
@@ -77,21 +78,21 @@ def mark_attendance(person_id, confidence, name):
                 "time": current_time,
                 "status": status,
                 "confidence": float(confidence),
-                "marked_by": "system",
-                "notes": f"Detected with confidence: {confidence:.2f}"
+                "marked_by": "system"
             }
             
-            insert_response = supabase_client.table("attendance").insert(attendance_data).execute()
+            response = supabase_client.table("attendance").insert(attendance_data).execute()
+            logger.info(f"Attendance response: {response.data}")
             
-            if hasattr(insert_response, "error") and insert_response.error:
-                logger.error(f"Error marking attendance: {insert_response.error}")
-                return False
-            else:
+            if response.data:
                 logger.info(f"Marked attendance for {name} as {status}")
                 return True
+            else:
+                logger.error("Failed to insert attendance record")
+                return False
         else:
             logger.info(f"Attendance already marked for {name} today")
-            return False
+            return True
     except Exception as e:
         logger.error(f"Error marking attendance: {str(e)}")
         return False

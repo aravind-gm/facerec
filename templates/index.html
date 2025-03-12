@@ -303,6 +303,15 @@
 </div>
 
 <script>
+    // Add this at the top of your script
+    const DEBUG = true;
+
+    function log(...args) {
+        if (DEBUG) {
+            console.log(...args);
+        }
+    }
+
     document.addEventListener('DOMContentLoaded', () => {
         // Camera initialization
         let stream;
@@ -345,6 +354,183 @@
             } catch (err) {
                 console.error("Error accessing camera: ", err);
                 alert("Error accessing camera. Please ensure camera permissions are granted.");
+            }
+        }
+
+        async function fetchTodayAttendance() {
+            try {
+                const today = new Date().toISOString().split('T')[0];
+                log("Fetching attendance for:", today);
+                
+                const response = await fetch(`/api/attendance/?start_date=${today}&end_date=${today}`);
+                
+                if (!response.ok) {
+                    throw new Error('Failed to fetch attendance data');
+                }
+
+                const attendanceRecords = await response.json();
+                log("Received attendance records:", attendanceRecords);
+                
+                const attendanceContainer = document.getElementById('attendanceContainer');
+
+                if (!attendanceRecords || attendanceRecords.length === 0) {
+                    attendanceContainer.innerHTML = `
+                        <div class="text-gray-500 text-center py-12">
+                            <i class="far fa-clipboard text-4xl mb-3"></i>
+                            <p class="mb-1">No attendance records yet</p>
+                            <p class="text-sm">Students will appear here once recognized</p>
+                        </div>`;
+                    return;
+                }
+
+                // Sort records by time (most recent first)
+                attendanceRecords.sort((a, b) => new Date(b.time) - new Date(a.time));
+
+                const attendanceHTML = attendanceRecords.map(record => `
+                    <div class="attendance-card bg-white rounded-lg p-4 mb-3 shadow-sm">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center">
+                                <div class="avatar-container">
+                                    <div class="bg-blue-100 p-3 rounded-lg">
+                                        <i class="fas fa-user text-blue-500"></i>
+                                    </div>
+                                    <div class="status-badge ${
+                                        record.status === 'present' ? 'bg-green-500' :
+                                        record.status === 'late' ? 'bg-yellow-500' :
+                                        'bg-red-500'} w-3 h-3 rounded-full">
+                                    </div>
+                                </div>
+                                <div class="ml-3">
+                                    <h3 class="font-medium text-gray-800">${record.person.name}</h3>
+                                    <p class="text-sm text-gray-500">${record.person.employee_id}</p>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-sm font-medium ${
+                                    record.status === 'present' ? 'text-green-600' :
+                                    record.status === 'late' ? 'text-yellow-600' :
+                                    'text-red-600'}">${
+                                    record.status.charAt(0).toUpperCase() + record.status.slice(1)
+                                }</p>
+                                <p class="text-xs text-gray-500">${new Date(record.time).toLocaleTimeString()}</p>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+
+                attendanceContainer.innerHTML = attendanceHTML;
+
+                // Update counts
+                const presentCount = attendanceRecords.filter(r => r.status === 'present').length;
+                const lateCount = attendanceRecords.filter(r => r.status === 'late').length;
+                const absentCount = attendanceRecords.filter(r => r.status === 'absent').length;
+
+                document.getElementById('presentCount').textContent = presentCount + lateCount;
+                document.getElementById('absentCount').textContent = absentCount;
+
+            } catch (error) {
+                console.error('Error fetching attendance:', error);
+                document.getElementById('attendanceContainer').innerHTML = `
+                    <div class="text-center text-red-500 py-4">
+                        <i class="fas fa-exclamation-circle text-2xl mb-2"></i>
+                        <p>Error loading attendance data: ${error.message}</p>
+                    </div>`;
+            }
+        }
+
+        // Add these lines to your initialization section
+        fetchTodayAttendance(); // Initial fetch
+        setInterval(fetchTodayAttendance, 30000); // Refresh every 30 seconds
+
+        // Update the detect_faces function to refresh attendance after detection
+        async function detect_faces() {
+            try {
+                const canvas = document.createElement('canvas');
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                
+                const imageData = canvas.toDataURL('image/jpeg');
+                
+                // Show loading state
+                const captureBtn = document.getElementById('captureBtn');
+                const detectionResult = document.getElementById('detectionResult');
+                captureBtn.disabled = true;
+                captureBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Processing...';
+                detectionResult.innerHTML = '<div class="text-center"><i class="fas fa-spinner fa-spin text-blue-500 text-2xl"></i><p class="mt-2">Processing image...</p></div>';
+
+                const response = await fetch('/api/detect-faces', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({ image_data: imageData })
+                });
+
+                const result = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(result.detail || 'Detection failed');
+                }
+
+                // Update detection results
+                let resultsHtml = '';
+                if (result.results && result.results.length > 0) {
+                    resultsHtml = `
+                        <div class="space-y-4">
+                            ${result.results.map(face => `
+                                <div class="flex items-center justify-between p-3 bg-white rounded-lg shadow">
+                                    <div class="flex items-center">
+                                        <div class="bg-blue-100 p-2 rounded-full mr-3">
+                                            <i class="fas fa-user text-blue-500"></i>
+                                        </div>
+                                        <div>
+                                            <h3 class="font-medium text-gray-800">${face.name}</h3>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <span class="px-2 py-1 bg-green-100 text-green-600 rounded-full text-sm">
+                                            <i class="fas fa-check mr-1"></i> Attendance Marked
+                                        </span>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>`;
+                } else {
+                    resultsHtml = `
+                        <div class="text-center py-4">
+                            <i class="fas fa-user-slash text-gray-400 text-2xl mb-2"></i>
+                            <p class="text-gray-500">No faces detected</p>
+                        </div>`;
+                }
+
+                detectionResult.innerHTML = resultsHtml;
+
+                // Update attendance counts
+                updateAttendanceCounts(result.results);
+
+                if (response.ok) {
+                    // After successful detection and displaying results
+                    detectionResult.innerHTML = resultsHtml;
+                    
+                    // Add this line to refresh the attendance list
+                    await fetchTodayAttendance();
+                }
+
+            } catch (error) {
+                console.error("Error detecting faces:", error);
+                document.getElementById('detectionResult').innerHTML = `
+                    <div class="text-center text-red-500">
+                        <i class="fas fa-exclamation-circle text-2xl mb-2"></i>
+                        <p>Error: ${error.message}</p>
+                    </div>`;
+            } finally {
+                // Reset capture button
+                const captureBtn = document.getElementById('captureBtn');
+                captureBtn.disabled = false;
+                captureBtn.innerHTML = '<i class="fas fa-camera mr-2"></i> Capture Attendance';
             }
         }
 
@@ -443,6 +629,73 @@
         updateDateTime();
         setInterval(updateDateTime, 60000);
         startCamera(video);
+
+        // Initial fetch of attendance
+        fetchTodayAttendance();
+        
+        // Refresh attendance every 30 seconds
+        setInterval(fetchTodayAttendance, 30000);
+
+        // Define detect_faces ONLY ONCE inside DOMContentLoaded
+        async function detect_faces() {
+            try {
+                const canvas = document.createElement('canvas');
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                
+                const imageData = canvas.toDataURL('image/jpeg');
+                
+                // Show loading state
+                const captureBtn = document.getElementById('captureBtn');
+                const detectionResult = document.getElementById('detectionResult');
+                captureBtn.disabled = true;
+                captureBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Processing...';
+                detectionResult.innerHTML = '<div class="text-center"><i class="fas fa-spinner fa-spin text-blue-500 text-2xl"></i><p class="mt-2">Processing image...</p></div>';
+
+                const response = await fetch('/api/detect-faces', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({ image_data: imageData })
+                });
+
+                const result = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(result.detail || 'Detection failed');
+                }
+
+                // Show simple success message
+                detectionResult.innerHTML = `
+                    <div class="text-center text-green-600 py-4">
+                        <i class="fas fa-check-circle text-2xl mb-2"></i>
+                        <p>Attendance marked successfully!</p>
+                    </div>`;
+
+                // Refresh attendance list
+                await fetchTodayAttendance();
+
+            } catch (error) {
+                console.error("Error detecting faces:", error);
+                detectionResult.innerHTML = `
+                    <div class="text-center text-red-500">
+                        <i class="fas fa-exclamation-circle text-2xl mb-2"></i>
+                        <p>Error: ${error.message}</p>
+                    </div>`;
+            } finally {
+                // Reset capture button
+                const captureBtn = document.getElementById('captureBtn');
+                captureBtn.disabled = false;
+                captureBtn.innerHTML = '<i class="fas fa-camera mr-2"></i> Capture Attendance';
+            }
+        }
+
+        // Make detect_faces available globally
+        window.detect_faces = detect_faces;
     });
 </script>
 </body>
