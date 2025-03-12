@@ -1,9 +1,15 @@
 from fastapi import FastAPI, HTTPException, Body, Request
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
+from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from database import supabase_client
-from models import Attendance, Person, Profile, RegisterFaceRequest, DetectionResponse
+from models import (
+    AttendanceResponse, 
+    Person, 
+    RegisterFaceRequest, 
+    DetectionResponse,
+    Attendance  # Add this import
+)
 from typing import List, Optional
 from datetime import datetime, date
 import base64
@@ -151,28 +157,27 @@ async def register_face(request: RegisterFaceRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/attendance/", response_model=List[Attendance])
-async def get_attendance(start_date: Optional[str] = None, end_date: Optional[str] = None):
-    """Fetch attendance records from Supabase with optional date filtering"""
+async def get_attendance():
+    """Fetch today's attendance records from Supabase"""
     try:
-        logger.info(f"Fetching attendance for dates: {start_date} to {end_date}")
+        today = datetime.now().strftime("%Y-%m-%d")
+        logger.info(f"Fetching attendance for today: {today}")
         
-        # Build the query
+        # Build the query for today only
         query = supabase_client.table("attendance")\
-            .select("*, people(*)") \
+            .select("*, people(*)")\
+            .eq('date', today)\
             .order('created_at', desc=True)
-        
-        # Apply date filters if provided
-        if start_date:
-            query = query.gte('date', start_date)
-        if end_date:
-            query = query.lte('date', end_date)
             
         response = query.execute()
         
         if not response.data:
-            logger.info("No attendance records found")
+            logger.info("No attendance records found for today")
             return []
-
+            
+        logger.info(f"Found {len(response.data)} attendance records for today")
+        logger.debug(f"Response data: {response.data}")
+        
         # Format the response data
         attendance_records = []
         for record in response.data:
@@ -185,23 +190,22 @@ async def get_attendance(start_date: Optional[str] = None, end_date: Optional[st
                     "time": record.get("time"),
                     "status": record.get("status"),
                     "confidence": record.get("confidence"),
-                    "marked_by": record.get("marked_by"),
+                    "marked_by": record.get("marked_by", "system"),
                     "notes": record.get("notes"),
                     "created_at": record.get("created_at"),
-                    "person": {
-                        "id": person_data.get("id"),
-                        "name": person_data.get("name"),
-                        "employee_id": person_data.get("employee_id"),
-                        "department": person_data.get("department"),
-                        "position": person_data.get("position")
-                    }
+                    "person": Person(
+                        id=person_data.get("id"),
+                        name=person_data.get("name"),
+                        employee_id=person_data.get("employee_id"),
+                        department=person_data.get("department"),
+                        position=person_data.get("position")
+                    ) if person_data else None
                 }
-                attendance_records.append(attendance_record)
+                attendance_records.append(Attendance(**attendance_record))
             except Exception as e:
                 logger.error(f"Error processing attendance record: {str(e)}")
                 continue
 
-        logger.info(f"Returning {len(attendance_records)} attendance records")
         return attendance_records
 
     except Exception as e:

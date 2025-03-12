@@ -23,6 +23,7 @@ try:
     
     if hasattr(test_query, 'data'):
         logger.info("Successfully connected to Supabase")
+        logger.debug(f"Test query result: {test_query.data}")
     else:
         logger.error("Connection test failed: Unable to query data")
         raise Exception("Failed to connect to Supabase")

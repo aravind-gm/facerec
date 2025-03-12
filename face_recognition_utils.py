@@ -70,6 +70,8 @@ def mark_attendance(person_id, confidence, name):
             .eq("person_id", person_id) \
             .eq("date", today) \
             .execute()
+            
+        logger.debug(f"Check response: {check_response.data}")
         
         if not check_response.data:
             attendance_data = {
@@ -82,7 +84,7 @@ def mark_attendance(person_id, confidence, name):
             }
             
             response = supabase_client.table("attendance").insert(attendance_data).execute()
-            logger.info(f"Attendance response: {response.data}")
+            logger.info(f"Insert response: {response.data}")
             
             if response.data:
                 logger.info(f"Marked attendance for {name} as {status}")
@@ -93,6 +95,7 @@ def mark_attendance(person_id, confidence, name):
         else:
             logger.info(f"Attendance already marked for {name} today")
             return True
+            
     except Exception as e:
         logger.error(f"Error marking attendance: {str(e)}")
         return False
@@ -163,4 +166,4 @@ def process_image(image_data, tolerance=0.6, model="hog", class_filter="AIML-A")
         return results
     except Exception as e:
         logger.error(f"Error in process_image: {str(e)}")
-        raise 
+        raise
