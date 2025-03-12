@@ -62,56 +62,93 @@ async def detect_faces(image_data: str = Body(..., embed=True)):
         logger.error(f"Error processing image: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error processing image: {str(e)}")
 
+# Table name verification constants
+PEOPLE_TABLE = "people"
+ATTENDANCE_TABLE = "attendance"
+
+# Update table references in the register_face endpoint
 @app.post("/api/register-face")
 async def register_face(request: RegisterFaceRequest):
     try:
-        # Clean up base64 data
-        image_data = request.image_data
-        if image_data.startswith("data:image"):
-            image_data = image_data.split(",")[1]
+        logger.info(f"Starting registration for {request.name}")
+        
+        # Validate input data
+        if not request.image_data:
+            raise HTTPException(status_code=400, detail="No image data provided")
             
-        # Decode image
-        image_bytes = base64.b64decode(image_data)
-        np_array = np.frombuffer(image_bytes, np.uint8)
-        image = cv2.imdecode(np_array, cv2.IMREAD_COLOR)
-        if image is None:
-            raise HTTPException(status_code=400, detail="Invalid image data")
+        if not request.name or not request.employee_id:
+            raise HTTPException(status_code=400, detail="Name and employee ID are required")
+        
+        # Create temp directory if it doesn't exist
+        image_path = f"temp/{request.name}_{uuid.uuid4()}.jpg"
+        os.makedirs("temp", exist_ok=True)
+        
+        try:
+            # Clean up base64 data
+            image_data = request.image_data
+            if "base64," in image_data:
+                image_data = image_data.split("base64,")[1]
             
-        rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        
-        # Detect faces
-        face_locations = face_recognition.face_locations(rgb_image)
-        if not face_locations:
-            raise HTTPException(status_code=400, detail="No face detected in image")
+            # Decode base64 image
+            image_bytes = base64.b64decode(image_data)
             
-        face_encoding = face_recognition.face_encodings(rgb_image, [face_locations[0]])[0]
-        
-        # Convert face encoding to base64
-        encoded_face = base64.b64encode(face_encoding.tobytes()).decode('utf-8')
-        
-        # Prepare person data
-        person_data = {
-            "name": request.name,
-            "employee_id": request.employee_id,
-            "department": request.department or "AIML-A",  # Allow department to be specified or default
-            "position": request.position or "Student",
-            "face_embedding": encoded_face,
-            "active": True
-        }
-        logger.info(f"Inserting data: {person_data}")
-        # Insert into Supabase
-        response = supabase_client.table("people").insert(person_data).execute()  # Use table() for clarity
-        
-        if response.error:  # Simplified error checking
-            raise HTTPException(status_code=500, detail=f"Database Error: {response.error}")
+            # Save image temporarily
+            with open(image_path, "wb") as f:
+                f.write(image_bytes)
             
-        return {"message": "Face registered successfully", "name": request.name}
-        
+            # Load and process image
+            image = cv2.imread(image_path)
+            if image is None:
+                raise HTTPException(status_code=400, detail="Could not read image data")
+            
+            # Convert to RGB for face_recognition
+            rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+            
+            # Detect faces
+            face_locations = face_recognition.face_locations(rgb_image)
+            if not face_locations:
+                raise HTTPException(status_code=400, detail="No face detected in image")
+            
+            # Get face encoding
+            face_encoding = face_recognition.face_encodings(rgb_image, [face_locations[0]])[0]
+            encoded_face = base64.b64encode(face_encoding.tobytes()).decode('utf-8')
+            
+            # Prepare person data
+            person_data = {
+                "name": request.name,
+                "employee_id": request.employee_id,
+                "department": request.department or "AIML-A",
+                "position": request.position or "Student",
+                "face_embedding": encoded_face,
+                "active": True
+            }
+            
+            # Insert into database
+            response = supabase_client.table(PEOPLE_TABLE).insert(person_data).execute()
+            
+            if not response.data:
+                raise HTTPException(status_code=500, detail="Failed to insert data into database")
+            
+            logger.info(f"Successfully registered {request.name}")
+            return {"message": "Face registered successfully", "name": request.name}
+            
+        except HTTPException as he:
+            raise he
+        except Exception as e:
+            logger.error(f"Error processing registration: {str(e)}")
+            raise HTTPException(status_code=500, detail=str(e))
+            
+        finally:
+            # Cleanup temporary file
+            if os.path.exists(image_path):
+                os.remove(image_path)
+                logger.info(f"Cleaned up temporary file: {image_path}")
+                
     except HTTPException as he:
         raise he
     except Exception as e:
-        logger.error(f"Error registering face: {e}")  # Log the full exception for debugging
-        raise HTTPException(status_code=500, detail=f"Error registering face: {e}")  # Return a generic error to the client
+        logger.error(f"Error in registration process: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/attendance/", response_model=List[Attendance])
 async def get_attendance(start_date: Optional[str] = None, end_date: Optional[str] = None):

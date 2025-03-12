@@ -1,5 +1,5 @@
 import os
-from supabase import create_client
+from supabase import create_client, Client
 from dotenv import load_dotenv
 import logging
 
@@ -17,7 +17,20 @@ SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJ
 try:
     # Initialize Supabase client
     supabase_client = create_client(SUPABASE_URL, SUPABASE_KEY)
-    logger.info("Successfully connected to Supabase")
+    
+    # Test the connection with a simple query
+    test_query = supabase_client.table('people').select("*").limit(1).execute()
+    
+    if hasattr(test_query, 'data'):
+        logger.info("Successfully connected to Supabase")
+    else:
+        logger.error("Connection test failed: Unable to query data")
+        raise Exception("Failed to connect to Supabase")
+        
 except Exception as e:
     logger.error(f"Error connecting to Supabase: {str(e)}")
     raise
+
+# Export the client
+if 'supabase_client' not in locals():
+    raise Exception("Failed to initialize Supabase client")

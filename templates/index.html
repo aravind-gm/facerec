@@ -199,7 +199,7 @@
                         <button id="captureBtn" onclick="detect_faces()" class="btn-primary flex-1 py-3 px-4 rounded-lg text-white font-medium flex items-center justify-center">
                             <i class="fas fa-camera mr-2"></i> Capture Attendance
                         </button>
-                        <button id="registerBtn" onclick="register_face" class="btn-secondary flex-1 py-3 px-4 rounded-lg text-white font-medium flex items-center justify-center">
+                        <button id="registerBtn" class="btn-secondary flex-1 py-3 px-4 rounded-lg text-white font-medium flex items-center justify-center">
                             <i class="fas fa-user-plus mr-2"></i> Register New Student 
                         </button>
                     </div>
@@ -300,8 +300,21 @@
             </div>
         </div>
     </div>
+</div>
 
-    <script>
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        // Camera initialization
+        let stream;
+        const video = document.getElementById('video');
+        const registerVideo = document.getElementById('registerVideo');
+        const registerBtn = document.getElementById('registerBtn');
+        const registerModal = document.getElementById('registerModal');
+        const closeModal = document.getElementById('closeModal');
+        const takePictureBtn = document.getElementById('takePictureBtn');
+        const submitRegistration = document.getElementById('submitRegistration');
+        let registrationImage = null;
+
         // Initialize date and time
         function updateDateTime() {
             const now = new Date();
@@ -311,17 +324,13 @@
             document.getElementById('currentDate').textContent = now.toLocaleDateString('en-US', dateOptions);
             document.getElementById('currentTime').textContent = now.toLocaleTimeString('en-US', timeOptions);
         }
-        
-        updateDateTime();
-        setInterval(updateDateTime, 60000);
-        
-        // Camera initialization
-        let stream;
-        const video = document.getElementById('video');
-        const registerVideo = document.getElementById('registerVideo');
-        
+
         async function startCamera(videoElement) {
             try {
+                if (stream) {
+                    stream.getTracks().forEach(track => track.stop());
+                }
+                
                 stream = await navigator.mediaDevices.getUserMedia({ 
                     video: { 
                         width: { ideal: 1280 },
@@ -329,217 +338,24 @@
                         facingMode: "user" 
                     } 
                 });
+                
                 videoElement.srcObject = stream;
+                await videoElement.play();
+                console.log("Camera started successfully");
             } catch (err) {
                 console.error("Error accessing camera: ", err);
                 alert("Error accessing camera. Please ensure camera permissions are granted.");
             }
         }
-        
-        // Start camera on page load
-        startCamera(video);
-        
-        // Capture attendance
-        let capturedImage = null;
-        const captureBtn = document.getElementById('captureBtn');
-        
-        captureBtn.addEventListener('click', async () => {
-            // Create ripple effect
-            const ripple = document.createElement('span');
-            ripple.className = 'ripple';
-            captureBtn.appendChild(ripple);
-            
-            const rect = captureBtn.getBoundingClientRect();
-            ripple.style.width = ripple.style.height = Math.max(rect.width, rect.height) + 'px';
-            ripple.style.left = (event.clientX - rect.left - ripple.offsetWidth / 2) + 'px';
-            ripple.style.top = (event.clientY - rect.top - ripple.offsetHeight / 2) + 'px';
-            
-            setTimeout(() => {
-                ripple.remove();
-            }, 800);
-            
-            // Capture image from video
-            const canvas = document.createElement('canvas');
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            
-            // Get base64 image data
-            const imageData = canvas.toDataURL('image/jpeg').split(',')[1];
-            
-            try {
-                // Show loading state
-                captureBtn.disabled = true;
-                captureBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Processing...';
-                
-                // Call API
-                const response = await fetch('http://127.0.0.1:8080/detect-faces', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ image_data: imageData })
-                });
-                
-                if (!response.ok) {
-                    throw new Error(`Server responded with ${response.status}`);
-                }
-                
-                const result = await response.json();
-                console.log(result);
-                
-                // Display results
-                displayDetectionResults(result, imageData);
-                
-                // Update attendance list if needed
-                if (result.results && result.results.length > 0) {
-                    updateAttendanceList(result.results);
-                }
-                
-            } catch (error) {
-                console.error("Error detecting faces: ", error);
-                document.getElementById('detectionResult').innerHTML = `
-                    <div class="bg-red-50 text-red-600 p-4 rounded">
-                        <i class="fas fa-exclamation-circle mr-2"></i> Error: ${error.message}
-                    </div>
-                `;
-            } finally {
-                // Reset button state
-                captureBtn.disabled = false;
-                captureBtn.innerHTML = '<i class="fas fa-camera mr-2"></i> Capture Attendance';
-            }
-        });
-        
-        // Display detection results
-        function displayDetectionResults(data, imageData) {
-            const resultsContainer = document.getElementById('detectionResult');
-            
-            if (!data.results || data.results.length === 0) {
-                resultsContainer.innerHTML = `
-                    <div class="bg-yellow-50 text-yellow-600 p-4 rounded flex items-center">
-                        <i class="fas fa-exclamation-triangle text-xl mr-3"></i>
-                        <div>
-                            <p class="font-medium">No faces detected</p>
-                            <p class="text-sm">Please ensure the person is clearly visible in the camera</p>
-                        </div>
-                    </div>
-                `;
-                return;
-            }
-            
-            let resultsHTML = `
-                <div class="mb-3 flex justify-between items-center">
-                    <p class="font-medium">Detected ${data.results.length} ${data.results.length === 1 ? 'person' : 'people'}</p>
-                    <span class="text-xs text-gray-500">${new Date().toLocaleTimeString()}</span>
-                </div>
-            `;
-            
-            data.results.forEach(person => {
-                const confidencePercentage = Math.round(person.confidence * 100);
-                const confidenceColor = confidencePercentage > 80 ? 'green' : (confidencePercentage > 60 ? 'yellow' : 'red');
-                
-                resultsHTML += `
-                    <div class="bg-white rounded-lg p-3 mb-2 shadow-sm flex items-center justify-between">
-                        <div class="flex items-center">
-                            <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center mr-3">
-                                <i class="fas fa-user text-blue-600"></i>
-                            </div>
-                            <div>
-                                <p class="font-medium">${person.name}</p>
-                                <p class="text-xs text-gray-500">
-                                    ${person.attendance_marked ? 
-                                        '<i class="fas fa-check-circle text-green-600 mr-1"></i> Attendance marked' : 
-                                        '<i class="fas fa-clock text-yellow-600 mr-1"></i> Processing'}
-                                </p>
-                            </div>
-                        </div>
-                        <div class="text-right">
-                            <div class="inline-block px-2 py-1 rounded-full text-xs text-${confidenceColor}-600 bg-${confidenceColor}-100">
-                                <i class="fas fa-percentage mr-1"></i> ${confidencePercentage}%
-                            </div>
-                        </div>
-                    </div>
-                `;
-            });
-            
-            resultsContainer.innerHTML = resultsHTML;
-        }
-        
-        // Update attendance list
-        function updateAttendanceList(people) {
-            const attendanceContainer = document.getElementById('attendanceContainer');
-            const presentCount = document.getElementById('presentCount');
-            
-            // Clear previous "no attendance" message if exists
-            if (attendanceContainer.querySelector('.text-center')) {
-                attendanceContainer.innerHTML = '';
-            }
-            
-            // Create attendance cards for new people
-            people.forEach(person => {
-                if (person.attendance_marked && person.name !== 'Unknown') {
-                    const existingCard = document.getElementById(`attendance-${person.name.replace(/\s+/g, '')}`);
-                    
-                    if (!existingCard) {
-                        const card = document.createElement('div');
-                        card.id = `attendance-${person.name.replace(/\s+/g, '')}`;
-                        card.className = 'attendance-card bg-white rounded-lg shadow-sm p-4 mb-3 flex items-center justify-between';
-                        
-                        const now = new Date();
-                        const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-                        const status = now.getHours() < 9 ? 'present' : 'late';
-                        
-                        card.innerHTML = `
-                            <div class="flex items-center">
-                                <div class="avatar-container bg-gray-100 w-12 h-12 rounded-lg mr-4 flex items-center justify-center">
-                                    <i class="fas fa-user text-xl text-blue-500"></i>
-                                    <div class="status-badge w-4 h-4 rounded-full ${status === 'present' ? 'bg-green-500' : 'bg-yellow-500'}"></div>
-                                </div>
-                                <div>
-                                    <h3 class="font-medium">${person.name}</h3>
-                                    <p class="text-xs text-gray-500">AIML-A Student</p>
-                                </div>
-                            </div>
-                            <div>
-                                <div class="text-xs font-medium ${status === 'present' ? 'text-green-600' : 'text-yellow-600'} mb-1">
-                                    ${status === 'present' ? 'Present' : 'Late'}
-                                </div>
-                                <div class="text-xs text-gray-500">${timeStr}</div>
-                            </div>
-                        `;
-                        
-                        // Add to container at the top
-                        if (attendanceContainer.firstChild) {
-                            attendanceContainer.insertBefore(card, attendanceContainer.firstChild);
-                        } else {
-                            attendanceContainer.appendChild(card);
-                        }
-                        
-                        // Update count
-                        presentCount.textContent = parseInt(presentCount.textContent) + 1;
-                        
-                        // Animation
-                        card.style.opacity = '0';
-                        card.style.transform = 'translateY(20px)';
-                        setTimeout(() => {
-                            card.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
-                            card.style.opacity = '1';
-                            card.style.transform = 'translateY(0)';
-                        }, 100);
-                    }
-                }
-            });
-        }
-        
-        // Register modal functionality
-        const registerBtn = document.getElementById('registerBtn');
-        const registerModal = document.getElementById('registerModal');
-        const closeModal = document.getElementById('closeModal');
-        
-        registerBtn.addEventListener('click', () => {
+
+        function register_face() {
             registerModal.classList.remove('hidden');
             startCamera(registerVideo);
-        });
-        
+        }
+
+        // Event Listeners
+        registerBtn.addEventListener('click', register_face);
+
         closeModal.addEventListener('click', () => {
             registerModal.classList.add('hidden');
             if (registerVideo.srcObject) {
@@ -547,11 +363,7 @@
                 tracks.forEach(track => track.stop());
             }
         });
-        
-        // Take picture for registration
-        let registrationImage = null;
-        const takePictureBtn = document.getElementById('takePictureBtn');
-        
+
         takePictureBtn.addEventListener('click', () => {
             const canvas = document.createElement('canvas');
             canvas.width = registerVideo.videoWidth;
@@ -559,9 +371,9 @@
             const ctx = canvas.getContext('2d');
             ctx.drawImage(registerVideo, 0, 0, canvas.width, canvas.height);
             
-            registrationImage = canvas.toDataURL('image/jpeg').split(',')[1];
+            registrationImage = canvas.toDataURL('image/jpeg');
+            console.log("Picture taken successfully");
             
-            // Show success message
             takePictureBtn.innerHTML = '<i class="fas fa-check mr-2"></i> Picture Taken';
             takePictureBtn.classList.remove('btn-primary');
             takePictureBtn.classList.add('bg-green-500', 'hover:bg-green-600');
@@ -572,29 +384,28 @@
                 takePictureBtn.classList.remove('bg-green-500', 'hover:bg-green-600');
             }, 2000);
         });
-        
-        // Submit registration
-        const submitRegistration = document.getElementById('submitRegistration');
-        
+
         submitRegistration.addEventListener('click', async () => {
-            const name = document.getElementById('studentName').value;
-            const employeeId = document.getElementById('studentId').value;
-            const department = document.getElementById('studentDepartment').value;
-            const position = document.getElementById('studentPosition').value;
-            
-            if (!name || !employeeId || !department || !registrationImage) {
-                alert('Please fill all fields and take a picture');
-                return;
-            }
-            
-            // Show loading state
-            submitRegistration.disabled = true;
-            submitRegistration.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Registering...';
-            
             try {
-                const response = await fetch('http://127.0.0.1:8000/api/register-face', {  // Correct URL
+                const name = document.getElementById('studentName').value;
+                const employeeId = document.getElementById('studentId').value;
+                const department = document.getElementById('studentDepartment').value;
+                const position = document.getElementById('studentPosition').value;
+
+                if (!name || !employeeId || !registrationImage) {
+                    alert('Please fill all required fields and take a picture');
+                    return;
+                }
+
+                submitRegistration.disabled = true;
+                submitRegistration.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Registering...';
+
+                const response = await fetch('/api/register-face', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
                     body: JSON.stringify({
                         name,
                         employee_id: employeeId,
@@ -603,39 +414,36 @@
                         image_data: registrationImage
                     })
                 });
+
+                const result = await response.json();
                 
                 if (!response.ok) {
-                    throw new Error(`Server responded with ${response.status}`);
+                    throw new Error(result.detail || 'Registration failed');
                 }
-                
-                const result = await response.json();
-                console.log(result);
-                
-                // Show success message
+
                 alert('Student registered successfully!');
-                
-                // Close modal
                 registerModal.classList.add('hidden');
-                if (registerVideo.srcObject) {
-                    const tracks = registerVideo.srcObject.getTracks();
-                    tracks.forEach(track => track.stop());
-                }
                 
                 // Reset form
                 document.getElementById('studentName').value = '';
                 document.getElementById('studentId').value = '';
                 document.getElementById('studentPosition').selectedIndex = 0;
                 registrationImage = null;
-                
+
             } catch (error) {
-                console.error("Error registering face: ", error);
+                console.error("Error registering face:", error);
                 alert(`Error registering student: ${error.message}`);
             } finally {
-                // Reset button state
                 submitRegistration.disabled = false;
                 submitRegistration.innerHTML = '<i class="fas fa-user-plus mr-2"></i> Register Student';
             }
         });
-    </script>
+
+        // Initialize
+        updateDateTime();
+        setInterval(updateDateTime, 60000);
+        startCamera(video);
+    });
+</script>
 </body>
 </html>
