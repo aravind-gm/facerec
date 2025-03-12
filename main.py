@@ -31,13 +31,7 @@ app = FastAPI(title="Jain University AIML-A Attendance System")
 # CORS Middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://127.0.0.1:8000",  # If your frontend is served from port 8000
-        "http://localhost:8000",
-        "http://127.0.0.1:8080",  # If your frontend is served from port 8080 (like uvicorn's default)
-        "http://localhost:8080",  # Or any other ports your frontend might use
-        "http://localhost:5173"  # Common Vite port
-    ],
+    allow_origins=["*"],  # Update this for production
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -445,3 +439,7 @@ async def get_attendance_stats(start_date: Optional[str] = None, end_date: Optio
     except Exception as e:
         logger.error(f"Error calculating attendance stats: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error calculating attendance stats: {str(e)}")
+
+# Add this for Vercel
+from mangum import Mangum
+handler = Mangum(app)
