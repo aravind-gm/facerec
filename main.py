@@ -163,49 +163,95 @@ async def get_attendance():
         today = datetime.now().strftime("%Y-%m-%d")
         logger.info(f"Fetching attendance for today: {today}")
         
-        # Build the query for today only
-        query = supabase_client.table("attendance")\
-            .select("*, people(*)")\
-            .eq('date', today)\
-            .order('created_at', desc=True)
+        # First get all active students
+        students_response = supabase_client.table("people")\
+            .select("id, name, employee_id, department, position")\
+            .eq("department", "AIML-A")\
+            .eq("active", True)\
+            .execute()
             
-        response = query.execute()
-        
-        if not response.data:
-            logger.info("No attendance records found for today")
+        if not students_response.data:
+            logger.info("No active students found")
             return []
             
-        logger.info(f"Found {len(response.data)} attendance records for today")
-        logger.debug(f"Response data: {response.data}")
+        # Get today's attendance records
+        attendance_response = supabase_client.table("attendance")\
+            .select("*, people(*)")\
+            .eq('date', today)\
+            .execute()
+            
+        # Create a map of present students
+        present_students = {
+            record.get("person_id"): record 
+            for record in attendance_response.data
+        }
         
         # Format the response data
         attendance_records = []
-        for record in response.data:
+        
+        # Process present students
+        for record in attendance_response.data:
             try:
                 person_data = record.get('people', {})
-                attendance_record = {
-                    "id": record.get("id"),
-                    "person_id": record.get("person_id"),
-                    "date": record.get("date"),
-                    "time": record.get("time"),
-                    "status": record.get("status"),
-                    "confidence": record.get("confidence"),
-                    "marked_by": record.get("marked_by", "system"),
-                    "notes": record.get("notes"),
-                    "created_at": record.get("created_at"),
-                    "person": Person(
-                        id=person_data.get("id"),
-                        name=person_data.get("name"),
-                        employee_id=person_data.get("employee_id"),
-                        department=person_data.get("department"),
-                        position=person_data.get("position")
-                    ) if person_data else None
-                }
-                attendance_records.append(Attendance(**attendance_record))
+                if person_data:
+                    attendance_record = {
+                        "id": record.get("id"),
+                        "person_id": record.get("person_id"),
+                        "date": record.get("date"),
+                        "time": record.get("time"),
+                        "status": record.get("status"),
+                        "confidence": record.get("confidence"),
+                        "marked_by": record.get("marked_by", "system"),
+                        "notes": record.get("notes"),
+                        "created_at": record.get("created_at"),
+                        "person": Person(
+                            id=person_data.get("id"),
+                            name=person_data.get("name"),
+                            employee_id=person_data.get("employee_id"),
+                            department=person_data.get("department"),
+                            position=person_data.get("position")
+                        )
+                    }
+                    attendance_records.append(Attendance(**attendance_record))
             except Exception as e:
                 logger.error(f"Error processing attendance record: {str(e)}")
                 continue
+        
+        # Add absent students
+        current_time = datetime.now().strftime("%H:%M:%S")
+        for student in students_response.data:
+            if student["id"] not in present_students:
+                try:
+                    attendance_record = {
+                        "id": None,
+                        "person_id": student["id"],
+                        "date": today,
+                        "time": current_time,
+                        "status": "absent",
+                        "confidence": None,
+                        "marked_by": "system",
+                        "notes": "Automatically marked absent",
+                        "created_at": datetime.now().isoformat(),
+                        "person": Person(
+                            id=student["id"],
+                            name=student["name"],
+                            employee_id=student["employee_id"],
+                            department=student["department"],
+                            position=student["position"]
+                        )
+                    }
+                    attendance_records.append(Attendance(**attendance_record))
+                except Exception as e:
+                    logger.error(f"Error processing absent student: {str(e)}")
+                    continue
 
+        # Sort by status (present/late first, then absent) and time
+        attendance_records.sort(key=lambda x: (
+            x.status == "absent",  # False (present/late) comes before True (absent)
+            x.time
+        ))
+
+        logger.info(f"Returning {len(attendance_records)} attendance records")
         return attendance_records
 
     except Exception as e:

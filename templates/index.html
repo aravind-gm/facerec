@@ -386,7 +386,9 @@
                 attendanceRecords.sort((a, b) => new Date(`${a.date} ${a.time}`) - new Date(`${b.date} ${b.time}`));
 
                 const attendanceHTML = attendanceRecords.map(record => `
-                    <div class="attendance-card bg-white rounded-lg p-4 mb-3 shadow-sm">
+                    <div class="attendance-card bg-white rounded-lg p-4 mb-3 shadow-sm ${
+                        record.status === 'absent' ? 'border-l-4 border-red-500' : ''
+                    }">
                         <div class="flex items-center justify-between">
                             <div class="flex items-center">
                                 <div class="avatar-container">
@@ -414,6 +416,11 @@
                                 <p class="text-xs text-gray-500">${record.time}</p>
                             </div>
                         </div>
+                        ${record.status === 'absent' ? `
+                            <div class="mt-2 pt-2 border-t border-gray-100">
+                                <p class="text-xs text-gray-500">${record.notes || 'No attendance record'}</p>
+                            </div>
+                        ` : ''}
                     </div>
                 `).join('');
 
