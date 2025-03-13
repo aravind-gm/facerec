@@ -8,3 +8,4 @@ python-dotenv
 supabase
 Jinja2
 mangum
+dlib==19.22.1
