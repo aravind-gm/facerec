@@ -7,3 +7,4 @@ face-recognition
 python-dotenv
 supabase
 Jinja2
+mangum
